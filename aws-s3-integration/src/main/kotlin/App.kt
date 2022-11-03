@@ -1,55 +1,35 @@
 import aws.sdk.kotlin.services.s3.*
-import aws.sdk.kotlin.services.s3.model.BucketLocationConstraint
-import aws.smithy.kotlin.runtime.content.ByteStream
+import aws.sdk.kotlin.services.s3.model.CorsConfiguration
+import aws.sdk.kotlin.services.s3.model.CorsRule
+import aws.sdk.kotlin.services.s3.model.GetBucketCorsRequest
+import aws.sdk.kotlin.services.s3.model.PutBucketCorsRequest
 import kotlinx.coroutines.runBlocking
-import java.util.UUID
 
-val REGION = "ap-northeast-2"
-val BUCKET = "bucket-${UUID.randomUUID()}"
-val KEY = "key"
+const val REGION = "ap-northeast-2"
+const val BUCKET = "test-bucket-for-cheolho"
 
 fun main(): Unit = runBlocking {
     S3Client
         .fromEnvironment { region = REGION }
         .use { s3 ->
-            setupTutorial(s3)
-
-            println("Creating object $BUCKET/$KEY...")
-
-            s3.putObject {
+            val originCorsConfig = s3.getBucketCors(GetBucketCorsRequest {
                 bucket = BUCKET
-                key = KEY
-                body = ByteStream.fromString("Testing with the Kotlin SDK")
+            })
+
+            val newRule = CorsRule {
+                allowedMethods = listOf("PUT")
+                allowedOrigins = listOf("charlie")
             }
 
-            println("Object $BUCKET/$KEY created successfully!")
+            val corsConfig = CorsConfiguration {
+                corsRules = listOf(newRule) + originCorsConfig.corsRules!!
+            }
 
-            cleanUp(s3)
+            val request = PutBucketCorsRequest {
+                bucket = BUCKET
+                corsConfiguration = corsConfig
+            }
+
+            s3.putBucketCors(request)
         }
-}
-
-suspend fun setupTutorial(s3: S3Client) {
-    println("Creating bucket $BUCKET...")
-    s3.createBucket {
-        bucket = BUCKET
-        createBucketConfiguration {
-            locationConstraint = BucketLocationConstraint.fromValue(REGION)
-        }
-    }
-    println("Bucket $BUCKET created successfully!")
-}
-
-suspend fun cleanUp(s3: S3Client) {
-    println("Deleting object $BUCKET/$KEY...")
-    s3.deleteObject {
-        bucket = BUCKET
-        key = KEY
-    }
-    println("Object $BUCKET/$KEY deleted successfully!")
-
-    println("Deleting bucket $BUCKET...")
-    s3.deleteBucket {
-        bucket = BUCKET
-    }
-    println("Bucket $BUCKET deleted successfully!")
 }
